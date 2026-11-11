@@ -1,4 +1,12 @@
 module PeerwatchHelpers
+  # What every name resolves to in the specs unless resolve_to says otherwise.
+  DEFAULT_ADDRESS = "192.0.2.1".freeze
+
+  # Make one hostname resolve to these addresses, at the one resolver seam.
+  def resolve_to(host, *addresses)
+    allow(Peerwatch::Address).to receive(:resolve).with(host).and_return(addresses)
+  end
+
   def create_peer(name, **attrs)
     Peerwatch::Peer.create!({ name: name, url: "https://#{name}.example" }.merge(attrs))
   end

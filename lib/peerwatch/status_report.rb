@@ -28,6 +28,10 @@ module Peerwatch
 
     def observations(config)
       Peer.live.where.not(name: config.self_name.to_s).order(:name).filter_map do |peer|
+        # A blocked peer is no longer probed, so its last checks are stale
+        # and must not count towards another app's quorum.
+        next unless peer.permitted?
+
         checks = Check.for_peer(peer.name).recent_first.limit([ LOOKBACK, config.failure_threshold ].max).to_a
         latest = checks.first
         next unless latest

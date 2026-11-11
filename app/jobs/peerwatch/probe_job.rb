@@ -17,7 +17,8 @@ module Peerwatch
       # Joining via the seed URL: nothing to probe until the registry arrives.
       Sync.pull if others.none?
 
-      peers = others.order(:name).to_a
+      peers, blocked = others.order(:name).to_a.partition(&:permitted?)
+      log_blocked(blocked)
       reports = {}
       kinds = {}
       peers.each do |peer|
@@ -66,6 +67,16 @@ module Peerwatch
 
     def others
       Peer.live.where.not(name: Peerwatch.config.self_name)
+    end
+
+    # One line per run, however many peers are blocked.
+    def log_blocked(blocked)
+      return if blocked.empty?
+
+      Peerwatch.logger&.warn(
+        "[Peerwatch] not probing #{blocked.size} peer(s) blocked by this app's rules: " +
+          blocked.map { |peer| "#{peer.name} (#{peer.blocked_reasons.to_sentence})" }.join("; ")
+      )
     end
   end
 end

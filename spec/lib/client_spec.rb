@@ -52,4 +52,55 @@ RSpec.describe Peerwatch::Client do
     expect(client.push_registry([ { "name" => "charlie" } ]).kind).to eq(:ok)
     expect(stub).to have_been_requested
   end
+
+  describe "address checks" do
+    it "refuses a name that resolves to a private address: no request, so no token sent" do
+      resolve_to("bravo.example", "192.168.1.1")
+      stub = stub_request(:get, status_url).to_return(status: 200, body: "{}")
+
+      reply = client.status
+
+      expect(reply.kind).to eq(:unreachable)
+      expect(reply.error_class).to eq("Peerwatch::Address::NotPublic")
+      expect(stub).not_to have_been_requested
+    end
+
+    it "refuses when any one of several resolved addresses is not public" do
+      resolve_to("bravo.example", "203.0.113.10", "fc00::1")
+      stub = stub_request(:post, "https://bravo.example/peerwatch/registry")
+
+      expect(client.push_registry([]).error_class).to eq("Peerwatch::Address::NotPublic")
+      expect(stub).not_to have_been_requested
+    end
+
+    it "refuses a private IP literal without resolving it" do
+      expect(Peerwatch::Address).not_to receive(:resolve)
+
+      reply = described_class.new("https://169.254.169.254").registry
+
+      expect(reply.kind).to eq(:unreachable)
+      expect(reply.error_class).to eq("Peerwatch::Address::NotPublic")
+    end
+
+    it "pins the connection to the checked address, keeping the hostname for TLS" do
+      resolve_to("bravo.example", "203.0.113.10")
+      seen = nil
+      allow_any_instance_of(Net::HTTP).to receive(:request) do |http, *|
+        seen = [ http.address, http.ipaddr, http.use_ssl?, http.proxy? ]
+        Net::HTTPServiceUnavailable.new("1.1", "503", "Service Unavailable")
+      end
+
+      client.status
+
+      expect(seen).to eq([ "bravo.example", "203.0.113.10", true, false ])
+    end
+  end
+
+  it "does not follow a redirect: one request, and the reply is unreachable" do
+    first = stub_request(:get, status_url).to_return(status: 302, headers: { "Location" => "https://127.0.0.1/peerwatch/status" })
+
+    expect(client.status.kind).to eq(:unreachable)
+    expect(first).to have_been_requested.once
+    expect(a_request(:get, "https://127.0.0.1/peerwatch/status")).not_to have_been_made
+  end
 end

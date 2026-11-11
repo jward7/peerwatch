@@ -62,6 +62,17 @@ RSpec.describe "Peerwatch dashboard" do
     expect(page.text).to include("bravo") # alerted_by on the resolved planned incident
     expect(page.css("table").size).to eq(3)
   end
+
+  it "marks a peer this app's rules block, and only that one" do
+    Peerwatch::Peer.find_by!(name: "delta").update_columns(url: "https://10.0.0.9")
+
+    get "/peerwatch"
+
+    delta = page.at_css("tr[data-peer='delta'] th")
+    expect(delta.at_css(".badge.text-bg-warning").text).to eq("blocked by this app's rules")
+    expect(delta.text).to include("must not point at a loopback, private or link-local address")
+    expect(page.css(".badge.text-bg-warning").size).to eq(1)
+  end
 end
 
 RSpec.describe "Peerwatch dashboard on a fresh install" do

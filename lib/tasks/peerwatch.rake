@@ -22,7 +22,7 @@ namespace :peerwatch do
 
     # Synchronous on purpose: this app may be about to go down.
     accepted = Peerwatch::Sync.push(peer)
-    targets = Peerwatch::Peer.live.where.not(name: self_name).count
+    targets = Peerwatch::Sync.targets.size # peers this app's rules block are never pushed to
     window = minutes.zero? ? "cleared" : "until #{peer.maintenance_until.utc.strftime("%Y-%m-%d %H:%M UTC")}"
     puts "Peerwatch: maintenance #{window}; #{accepted} of #{targets} peers accepted it."
   end

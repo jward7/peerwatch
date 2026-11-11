@@ -149,7 +149,7 @@ In **each** app:
 
 ```ruby
 # Gemfile (from git until the gem is released to RubyGems)
-gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.1.1"
+gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.1.2"
 ```
 
 ```sh
@@ -181,6 +181,8 @@ Peerwatch.configure do |config|
   config.token = Rails.application.credentials.dig(:peerwatch, :token)
   config.admin_parent_controller = "Admin::BaseController"      # an admin-only base controller
   config.mailer_parent = "ApplicationMailer"                    # for your From address
+  config.allowed_peer_hosts = %w[alpha.example bravo.example]   # every app's hostname
+  config.allowed_contact_domains = %w[example.com]              # where alert mail may go
 end
 ```
 
@@ -218,9 +220,15 @@ Peerwatch's controllers and mailer load, so set them in the initializer and nowh
 | `fallback_after` | `480` (`8 * 60`) | Seconds the elected sender has before another agreeing app sends the email instead. |
 | `retention_days` | `30` | Days of checks to keep. Older checks are deleted at the end of each cycle. Incidents are kept. |
 | `allow_http` | `false` | Accept plain `http` peer URLs. For local testing only: the token would travel unencrypted. |
+| `allow_private_addresses` | `false` | Allow peer URLs and IP addresses that are loopback, private, link-local or otherwise not public, and connect to names that resolve to them. For local testing against `localhost` only. See [Security and trust model](#security-and-trust-model). |
+| `allowed_peer_hosts` | `nil` | `nil` means any host. An Array of hostnames, such as `%w[alpha.example bravo.example]`: a peer URL's host must be one of them (case-insensitive, exact match). Set it in production. |
+| `allowed_contact_domains` | `nil` | `nil` means any domain. An Array of domains, such as `%w[example.com]`: every contact email must be at one of them (case-insensitive, exact match on the part after the `@`, so subdomains are not included). Set it in production. |
 
 Every outbound request carries `User-Agent: peerwatch/<version>`. `Net::HTTP`'s
 automatic retry is turned off, so the two timeouts are the real limit on each request.
+Redirects are never followed. Outbound requests ignore `http_proxy` and `https_proxy`
+in the environment, because a proxy would resolve peer names itself and defeat the
+address check described in [Security and trust model](#security-and-trust-model).
 
 ## Maintenance windows
 
@@ -295,11 +303,55 @@ keep it quick; enqueue a job of your own if it has slow work to do.
 
 ## Security and trust model
 
-- **One shared token.** Every app in the mesh presents the same token, and whoever holds
-  it can read and edit the registry in every app. Editing the registry means choosing
-  which URLs and IP addresses your apps will send requests to (with the token attached),
-  and which addresses they will email. Treat the token like a credential to every app's
-  admin. Keep it in your credentials store, never in source.
+Every app in the mesh presents the same token, and whoever holds it can read and write
+the registry in every app. Each app then acts on those rows: it sends requests to each
+peer's URL (the status and registry requests carry the token) and emails each peer's
+contacts when that peer is down. So each app treats every registry row as untrusted,
+whether it arrived from another app or was typed into its own peers page.
+
+**What a token holder cannot make your apps do:**
+
+- **Request a non-public address.** A peer URL whose host is a loopback, private,
+  link-local, unspecified or multicast IP address (IPv4 or IPv6, including IPv4-mapped
+  IPv6 forms), the name `localhost` or any `*.localhost` name, or a stored IP address that
+  is not public, is refused when the row is saved. Every request also resolves the name
+  first and refuses it if *any* address it resolves to is not public, then connects to
+  the address it checked, so the name cannot resolve to something else in between. That
+  covers DNS that points a public-looking name at a private address, and the seed URL
+  too. A refused request is a failed check recorded with the error class
+  `Peerwatch::Address::NotPublic`; no request is sent. Redirects are never followed, so a
+  peer cannot bounce a request elsewhere. `allow_private_addresses` turns all of this
+  off, for local testing only.
+- **Request a host you have not listed**, once `allowed_peer_hosts` is set.
+- **Email an address outside your domains**, once `allowed_contact_domains` is set.
+
+A row that breaks these rules is refused by the peers page with an error, and skipped
+with a logged warning when it arrives from another app; the rest of that app's registry
+still applies. Validation does not run on rows already stored, and you may tighten the
+rules after rows exist, so each app also checks every stored row as it uses it. A row
+that now breaks a rule is not probed, synced with, counted as an observer or emailed,
+and the dashboard shows it with a "blocked by this app's rules" note and the reason.
+
+**Set both allowlists in production**, in every app. Without them, a token holder can
+still point a peer at any public host and send alert mail to any address.
+
+**What a token holder can still do, even with both allowlists set:**
+
+- Add, change or remove peers within your allowed hosts, which changes which apps are
+  watched.
+- Change a peer's contacts within your allowed domains.
+- Declare a maintenance window for any peer, which silences its alerts while it lasts.
+- Read every peer's contact addresses from the registry endpoint.
+
+This is because there is still **one shared secret for the whole mesh**: any app's
+token is every app's token, and the apps cannot tell an edit made by one app's admin
+from an edit made by someone who copied the token. Per-app credentials, or registry
+edits signed by the app that made them, would be the stronger design. Neither is
+implemented. Treat the token like a credential to every app's admin, and keep it in your
+credentials store, never in source.
+
+**Other properties:**
+
 - **404 on a bad token.** A missing or wrong token, or no token configured, gets an empty
   404 from both endpoints. Tokens are compared in constant time.
 - **Rotation.** There is only one token, so rotate it in every app at once. Until every
@@ -317,6 +369,17 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Limitations
 
+- **One shared token for the whole mesh.** Whoever holds it can add, change and remove
+  peers within `allowed_peer_hosts`, change contacts within `allowed_contact_domains`,
+  and declare maintenance to silence alerts. There are no per-app credentials and no
+  signed registry edits. See [Security and trust model](#security-and-trust-model).
+- **Peers must be on public addresses.** A mesh whose apps reach each other over a
+  private network (a VPC, a VPN, a Docker network) needs `allow_private_addresses`, which
+  removes the protection against requests to internal addresses.
+- **Outbound requests do not use a proxy.** `http_proxy` and `https_proxy` are ignored,
+  so an app that can only reach the internet through a proxy cannot probe its peers.
+- **One address per check.** A name that resolves to several addresses is checked in
+  full, but the request goes to one of them, IPv4 first, with no fallback to the others.
 - **Nothing outside the mesh watches the mesh.** If every app goes down together (one
   provider, one region, one DNS service), nobody is left to send the email. Pair
   Peerwatch with an outside monitor if that matters.

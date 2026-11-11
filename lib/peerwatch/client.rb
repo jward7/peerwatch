@@ -1,14 +1,23 @@
 require "net/http"
 require "uri"
 require "json"
+require "peerwatch/address"
 
 module Peerwatch
   # Talks to another app's Peerwatch endpoints. Never raises: every call
   # returns a Reply whose kind says what happened.
+  #
+  # The base URL comes from the registry or seed_url, and these requests
+  # carry the token, so each one goes through Address first: a name that
+  # resolves to a non-public address is refused without a request, and the
+  # connection is pinned to the address that was checked. Redirects are never
+  # followed.
   class Client
     # kind: :ok (body is parsed JSON), :maintenance (the app answered 503),
-    # :unreachable (anything else).
-    Reply = Struct.new(:kind, :body, keyword_init: true) do
+    # :unreachable (anything else). error_class names the exception behind an
+    # :unreachable reply, if there was one ("Peerwatch::Address::NotPublic"
+    # when the address was refused).
+    Reply = Struct.new(:kind, :body, :error_class, keyword_init: true) do
       def ok? = kind == :ok
     end
 
@@ -34,11 +43,15 @@ module Peerwatch
 
     def perform(verb, path)
       uri = URI.parse(@base + path)
-      http = Net::HTTP.new(uri.host, uri.port)
+      dial = Address.dial_address(uri.hostname, config: @config)
+      # No proxy (nil): a proxy would resolve the name itself, and the pin
+      # below would not hold.
+      http = Net::HTTP.new(uri.hostname, uri.port, nil)
       http.use_ssl = uri.scheme == "https"
       http.open_timeout = @config.open_timeout
       http.read_timeout = @config.read_timeout
       http.max_retries = 0 # keep the configured timeouts the real bound
+      http.ipaddr = dial if dial
 
       request = verb.new(uri.request_uri)
       request["User-Agent"] = @config.user_agent
@@ -52,8 +65,8 @@ module Peerwatch
       when 503 then Reply.new(kind: :maintenance)
       else Reply.new(kind: :unreachable)
       end
-    rescue StandardError
-      Reply.new(kind: :unreachable)
+    rescue StandardError => e
+      Reply.new(kind: :unreachable, error_class: e.class.name)
     end
   end
 end

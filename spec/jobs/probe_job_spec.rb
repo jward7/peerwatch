@@ -115,6 +115,22 @@ RSpec.describe Peerwatch::ProbeJob do
     expect(states).to eq([ %w[bravo up], %w[delta down] ])
   end
 
+  it "skips an existing peer this app's rules now block, logging once per run" do
+    Peerwatch::Peer.find_by!(name: "charlie").update_columns(url: "https://169.254.169.254")
+    Peerwatch::Peer.find_by!(name: "delta").update_columns(ip: "10.0.0.1")
+    logged = []
+    allow(Rails.logger).to receive(:warn) { |message| logged << message }
+
+    described_class.perform_now
+
+    expect(states).to eq([ %w[bravo up] ])
+    expect(a_request(:any, /169\.254\.169\.254/)).not_to have_been_made
+    expect(a_request(:get, "https://delta.example/up")).not_to have_been_made
+    blocked_lines = logged.grep(/blocked by this app's rules/)
+    expect(blocked_lines.size).to eq(1)
+    expect(blocked_lines.first).to include("2 peer(s)", "charlie (", "delta (")
+  end
+
   it "uses the configured queue" do
     Peerwatch.config.queue_name = :monitoring
 

@@ -28,4 +28,13 @@ RSpec.describe Peerwatch::AlertMailer do
     expect(mail.subject).to eq("Peerwatch: bravo recovered (down since 2026-01-05 03:12 UTC)")
     expect(mail.body.to_s).to include("Recovered at: 2026-01-05 03:40 UTC")
   end
+
+  it "sends nothing to a peer this app's rules block, even once queued" do
+    peer # saved before the rule tightens
+    Peerwatch.config.allowed_contact_domains = %w[example.net]
+
+    expect(described_class.down(peer, incident).message).to be_a(ActionMailer::Base::NullMail)
+    expect { described_class.down(peer, incident).deliver_now }.not_to change { ActionMailer::Base.deliveries.size }
+    expect { described_class.recovered(peer, incident).deliver_now }.not_to change { ActionMailer::Base.deliveries.size }
+  end
 end

@@ -16,10 +16,60 @@ module Peerwatch
     validate :url_must_be_web_address
     validate :health_path_must_be_absolute
     validate :contact_emails_must_be_valid
+    validate :must_follow_this_apps_rules
 
     before_save :stamp_revision, unless: :syncing
 
     scope :live, -> { where(removed_at: nil) }
+
+    # Whether this app's rules let it contact this peer and email its
+    # contacts: public addresses only (unless allow_private_addresses), and
+    # the allowed_peer_hosts and allowed_contact_domains lists. Validation
+    # enforces the same rules on save, but rules can be tightened after a row
+    # exists, so the probe job, sync and alerting ask this on every read.
+    def permitted?
+      rule_violations.empty?
+    end
+
+    # Why this app refuses the row, as full sentences; empty when permitted.
+    def blocked_reasons
+      rule_violations.map { |attribute, message| errors.full_message(attribute, message) }
+    end
+
+    # [[attribute, message], ...] for every one of this app's rules the row breaks.
+    def rule_violations
+      config = Peerwatch.config
+      violations = []
+
+      if ip.present?
+        if Address.parse(ip).nil?
+          violations << [ :ip, "is not an IP address" ]
+        elsif !config.allow_private_addresses && !Address.public?(ip)
+          violations << [ :ip, "must be a public address" ]
+        end
+      end
+
+      host = url_hostname
+      if host && !config.allow_private_addresses
+        if Address.localhost_name?(host)
+          violations << [ :url, "must not point at localhost" ]
+        elsif Address.ip_literal?(host) && !Address.public?(host)
+          violations << [ :url, "must not point at a loopback, private or link-local address" ]
+        end
+      end
+      if host && config.allowed_peer_hosts &&
+         Array(config.allowed_peer_hosts).map { |h| Address.normalize_host(h) }.exclude?(Address.normalize_host(host))
+        violations << [ :url, "host is not in this app's allowed_peer_hosts" ]
+      end
+
+      if config.allowed_contact_domains
+        domains = Array(config.allowed_contact_domains).map { |d| d.to_s.strip.downcase }
+        outside = Array(contact_emails).grep(String).reject { |e| domains.include?(e.rpartition("@").last.downcase) }
+        violations << [ :contact_emails, "must all be at a domain in this app's allowed_contact_domains" ] if outside.any?
+      end
+
+      violations
+    end
 
     def in_maintenance?(at = Time.current)
       maintenance_until.present? && maintenance_until > at
@@ -80,6 +130,16 @@ module Peerwatch
       end
     rescue URI::InvalidURIError
       errors.add(:url, "is not a valid URL")
+    end
+
+    def must_follow_this_apps_rules
+      rule_violations.each { |attribute, message| errors.add(attribute, message) }
+    end
+
+    def url_hostname
+      URI.parse(url.to_s).hostname.presence
+    rescue URI::InvalidURIError
+      nil
     end
 
     def health_path_must_be_absolute

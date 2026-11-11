@@ -173,6 +173,41 @@ RSpec.describe Peerwatch::Evaluator do
     expect(mails).to be_empty
   end
 
+  describe "a peer this app's rules block" do
+    it "never mails its contacts, nor notifies, however its checks look" do
+      down_checks("bravo", 2)
+      Peerwatch.config.allowed_contact_domains = %w[example.net]
+
+      evaluate(agreeing)
+
+      expect(mails).to be_empty
+      expect(events).to be_empty
+      expect(incident).to be_nil
+    end
+
+    it "never mails a recovery to its contacts" do
+      down_checks("bravo", 2)
+      evaluate(agreeing)
+      expect(mails.size).to eq(1)
+
+      Peerwatch.config.allowed_contact_domains = %w[example.net]
+      add_check("bravo", "up", at: now + 2.minutes)
+      add_check("bravo", "up", at: now + 4.minutes)
+      evaluate({}, at: now + 5.minutes)
+
+      expect(mails.size).to eq(1)
+    end
+
+    it "is not an observer whose agreement is awaited" do
+      Peerwatch::Peer.find_by!(name: "charlie").update_columns(ip: "127.0.0.1")
+      down_checks("bravo", 2)
+
+      evaluate
+
+      expect(mails.map(&:to)).to eq([ [ "ops@example.com" ] ])
+    end
+  end
+
   describe "a declared maintenance window" do
     before do
       Peerwatch::Peer.find_by!(name: "bravo").update!(maintenance_until: now + 30.minutes, maintenance_note: "db upgrade")

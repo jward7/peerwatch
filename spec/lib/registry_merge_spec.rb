@@ -70,6 +70,39 @@ RSpec.describe Peerwatch::RegistryMerge do
     expect(Peerwatch::Peer.pluck(:name)).to eq([ "bravo" ])
   end
 
+  it "skips a row that breaks this app's rules, logging the peer and the reason, and applies the rest" do
+    Peerwatch.config.allowed_peer_hosts = %w[bravo.example charlie.example delta.example foxtrot.example]
+    Peerwatch.config.allowed_contact_domains = %w[example.com]
+    logged = []
+    allow(Rails.logger).to receive(:warn) { |message| logged << message }
+    rows = [
+      row("bravo", earlier),
+      row("charlie", earlier, contact_emails: [ "someone@example.net" ]),
+      row("delta", earlier, ip: "169.254.169.254"),
+      row("echo", earlier),
+      row("foxtrot", earlier, url: "https://10.0.0.1")
+    ]
+
+    expect(described_class.call(rows)).to eq(1)
+    expect(Peerwatch::Peer.pluck(:name)).to eq([ "bravo" ])
+    expect(logged).to include(
+      a_string_including('"charlie"', "allowed_contact_domains"),
+      a_string_including('"delta"', "Ip must be a public address"),
+      a_string_including('"echo"', "allowed_peer_hosts"),
+      a_string_including('"foxtrot"', "loopback, private or link-local")
+    )
+    expect(logged.join).not_to include("secret", "someone@example.net")
+  end
+
+  it "keeps the existing row when a newer one breaks this app's rules" do
+    described_class.call([ row("bravo", earlier, environment: "production") ])
+    Peerwatch.config.allowed_contact_domains = %w[example.com]
+
+    expect(described_class.call([ row("bravo", later, contact_emails: [ "ops@example.net" ]) ])).to eq(0)
+    expect(Peerwatch::Peer.find_by!(name: "bravo")).to have_attributes(environment: "production",
+                                                                       contact_emails: [ "ops@example.com" ])
+  end
+
   it "returns zero for something that is not a list" do
     expect(described_class.call(nil)).to eq(0)
     expect(described_class.call("peers")).to eq(0)

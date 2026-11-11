@@ -12,6 +12,7 @@ to follow it. The examples use the placeholder apps `alpha` (the first app) and 
 - [5. What commonly blocks the endpoints](#5-what-commonly-blocks-the-endpoints)
 - [6. A staging app with a mail catcher](#6-a-staging-app-with-a-mail-catcher)
 - [7. Uninstalling](#7-uninstalling)
+- [8. Trying two apps on one machine](#8-trying-two-apps-on-one-machine)
 
 ## 1. Prerequisites
 
@@ -46,7 +47,7 @@ Until the gem is published to RubyGems, install it from a git tag:
 
 ```ruby
 # Gemfile
-gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.1.1"
+gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.1.2"
 ```
 
 Use the newest tag on the repository's releases page. A git-sourced gem needs `git`
@@ -91,8 +92,10 @@ password. See [Security and trust model](../README.md#security-and-trust-model).
 ### 2.3 Configure the initializer
 
 Here is a worked example for a typical app, with every setting. The timeouts, thresholds
-and the settings after them are shown at their defaults. The full list, with defaults,
-is in the README's [configuration reference](../README.md#configuration-reference).
+and the settings after them are shown at their defaults, except the two allowlists,
+which default to `nil` (any) and are shown set, as they should be in production. The
+full list, with defaults, is in the README's
+[configuration reference](../README.md#configuration-reference).
 
 ```ruby
 # config/initializers/peerwatch.rb
@@ -129,8 +132,23 @@ Peerwatch.configure do |config|
   config.fallback_after = 8 * 60        # seconds before another app sends the email instead
   config.retention_days = 30            # days of checks to keep
   config.allow_http = false             # true only for local testing over plain http
+  config.allow_private_addresses = false # true only for local testing against localhost
+
+  # Registry rows come from whoever holds the token, so limit what they can make this
+  # app do. A peer URL's host must be one of these (exact, case-insensitive):
+  config.allowed_peer_hosts = %w[alpha.example bravo.example]
+  # and every contact email must be at one of these domains (exact, case-insensitive):
+  config.allowed_contact_domains = %w[example.com]
 end
 ```
+
+**`allowed_peer_hosts` and `allowed_contact_domains`.** Both default to `nil`, meaning
+any host and any domain. Set both in every app in production, and keep them the same
+across the mesh: an app refuses a row that breaks its lists, so a host missing from one
+app's list leaves that app unable to watch it. Adding an app to the mesh then means
+adding its hostname to every app's list and deploying them before you add its row. See
+[Security and trust model](../README.md#security-and-trust-model) for what the lists
+protect against and what they do not.
 
 **`admin_parent_controller`.** Peerwatch's admin pages, the dashboard at `/peerwatch` and
 the peers page at `/peerwatch/peers`, inherit the controller you name here. They are
@@ -274,7 +292,8 @@ The fields are:
 - **Health path**: default `/up`. Point it at a deeper check if you have one, such as
   a page from a health-check gem that also tests the database.
 - **IP address** (optional): when a check fails, Peerwatch retries once against this
-  address, keeping the hostname for TLS, to tell a DNS failure from an app failure.
+  address, keeping the hostname for TLS, to tell a DNS failure from an app failure. It
+  must be a public address.
 - **Environment** (optional): shown on the dashboard.
 - **Contact emails**: one per line or comma-separated. They are emailed when this app is
   down and when it recovers.
@@ -359,6 +378,9 @@ Rack middleware and your router. These are the usual obstacles.
 | **A site-wide access gate** (HTTP basic auth, an IP allowlist, an identity-aware proxy) | The probe gets a 401, 403 or a redirect to a login page, which counts as down. | Exempt the health path, `/peerwatch/status` and `/peerwatch/registry`. The admin pages at `/peerwatch` and `/peerwatch/peers` can stay behind the gate. |
 | **Forcing SSL** (`config.force_ssl`) | A peer URL entered as `http://` gets a 301, which counts as down. | Use `https` peer URLs, which is the default requirement anyway. Peerwatch does not follow redirects. |
 | **Mounting inside an authenticated route block** | The status endpoint redirects to sign-in. | Mount the engine outside it ([2.5](#25-mount-the-engine)). |
+| **A peer on a private address** (a VPC, VPN or Docker network address, or a name that resolves to one) | The peers page refuses the row, or checks fail with the error class `Peerwatch::Address::NotPublic` and no request is sent. | Use each app's public hostname. Only if the apps can reach each other solely over a private network, set `allow_private_addresses = true`, knowing it removes the protection against requests to internal addresses. |
+| **The allowlists** (`allowed_peer_hosts`, `allowed_contact_domains`) | The peers page refuses the row; rows from other apps are skipped with a `[Peerwatch] registry merge: ignored ...` warning; the dashboard marks an existing row "blocked by this app's rules". | Add the host or domain to the lists in every app and deploy. |
+| **An egress proxy** (`http_proxy`, `https_proxy`) | Every check fails with a connection error. | Peerwatch ignores proxy settings, because a proxy would resolve peer names itself. Allow direct outbound HTTPS to your peers. |
 
 ## 6. A staging app with a mail catcher
 
@@ -408,3 +430,25 @@ To take one app out of the mesh:
 4. **Remove the token** from the app's credentials.
 
 To retire the whole mesh, uninstall every app. There is nothing to remove anywhere else.
+
+## 8. Trying two apps on one machine
+
+To try Peerwatch before deploying, run two apps locally, for example `alpha` on port
+3000 and `bravo` on port 3001, each with its own database and the same token. Peerwatch
+refuses plain `http` and refuses to connect to `localhost` or any other non-public
+address, so in development only, set both of these in each app:
+
+```ruby
+Peerwatch.configure do |config|
+  # ...
+  config.allow_http = Rails.env.development?
+  config.allow_private_addresses = Rails.env.development?
+end
+```
+
+Then add the rows with base URLs `http://localhost:3000` and `http://localhost:3001`. If
+you also set `allowed_peer_hosts` in development, include `localhost` in it. Run the
+probe by hand with `bin/rails runner "Peerwatch::ProbeJob.perform_now"` in each app, or
+schedule it as in [2.6](#26-schedule-the-probe). Never set either option in production:
+together they let anyone with the token make your apps send requests, with the token
+attached, to any address your servers can reach.

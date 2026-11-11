@@ -51,4 +51,16 @@ Peerwatch.configure do |config|
 
   # Plain http peer URLs are refused unless this is true (local testing only).
   # config.allow_http = Rails.env.development?
+
+  # Peerwatch never connects to a loopback, private, link-local or other
+  # non-public address, and refuses peer rows that name one, unless this is
+  # true (local testing against localhost only).
+  # config.allow_private_addresses = false
+
+  # Registry rows come from whoever holds the token. These limit what such a
+  # row can make this app do; nil means any. Set both in production.
+  # A peer URL's host must be one of these hostnames (exact, case-insensitive):
+  # config.allowed_peer_hosts = nil # e.g. %w[alpha.example bravo.example]
+  # Every contact email must be at one of these domains (exact, case-insensitive):
+  # config.allowed_contact_domains = nil # e.g. %w[example.com]
 end

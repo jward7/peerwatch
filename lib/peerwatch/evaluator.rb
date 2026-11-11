@@ -17,11 +17,18 @@ module Peerwatch
       Peerwatch.quietly("evaluator") do
         next if @config.self_name.blank?
 
-        live_names = Peer.live.pluck(:name)
+        live = Peer.live.order(:name).to_a
         # A removed peer is no longer evaluated, so close anything it left open.
-        Incident.open.where.not(peer_name: live_names).update_all(resolved_at: @now)
-        Peer.live.where.not(name: @config.self_name).order(:name).each do |peer|
-          Peerwatch.quietly("evaluate #{peer.name}") { evaluate(peer, live_names) }
+        Incident.open.where.not(peer_name: live.map(&:name)).update_all(resolved_at: @now)
+        # A peer this app's rules block is neither probed nor asked for a
+        # report, so it is not evaluated, its contacts are never emailed, and
+        # it is not counted as an observer whose agreement is awaited.
+        permitted = live.select(&:permitted?)
+        permitted_names = permitted.map(&:name)
+        permitted.each do |peer|
+          next if peer.name == @config.self_name
+
+          Peerwatch.quietly("evaluate #{peer.name}") { evaluate(peer, permitted_names) }
         end
       end
     end
@@ -92,7 +99,7 @@ module Peerwatch
     end
 
     def send_down(peer, incident)
-      if peer.contact_emails.any?
+      if peer.contact_emails.any? && peer.permitted?
         AlertMailer.down(peer, incident, overrun: incident.planned).deliver_later
       end
       incident.update!(alerted_at: @now, alerted_by: @config.self_name)
@@ -101,7 +108,7 @@ module Peerwatch
     def handle_recovery(peer, incident)
       incident.update!(resolved_at: @now)
       if incident.alerted_by == @config.self_name
-        AlertMailer.recovered(peer, incident).deliver_later if peer.contact_emails.any?
+        AlertMailer.recovered(peer, incident).deliver_later if peer.contact_emails.any? && peer.permitted?
         incident.update!(recovery_alerted_at: @now)
       end
       if incident.notified_at

@@ -5,8 +5,11 @@ module Peerwatch
   module Sync
     module_function
 
+    # Peers this app's rules block are never contacted. The seed URL is the
+    # host's own setting, so it is not held to the allowlists, but Client
+    # still refuses it if it resolves to a non-public address.
     def sources
-      urls = Peer.live.where.not(name: Peerwatch.config.self_name.to_s).pluck(:url)
+      urls = targets.map(&:url)
       urls << Peerwatch.config.seed_url if Peerwatch.config.seed_url.present?
       urls.map { |url| url.to_s.chomp("/") }.uniq
     end
@@ -30,10 +33,15 @@ module Peerwatch
 
       Peerwatch.quietly("registry push #{peer&.name}") do
         row = peer.registry_row
-        Peer.live.where.not(name: Peerwatch.config.self_name.to_s).count do |target|
+        targets.count do |target|
           Client.new(target.url).push_registry([ row ]).ok?
         end
       end || 0
+    end
+
+    # Every live peer except this app that this app's rules permit.
+    def targets
+      Peer.live.where.not(name: Peerwatch.config.self_name.to_s).order(:name).select(&:permitted?)
     end
   end
 end

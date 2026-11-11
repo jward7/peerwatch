@@ -1,5 +1,6 @@
 require "peerwatch/version"
 require "peerwatch/configuration"
+require "peerwatch/address"
 require "peerwatch/probe"
 require "peerwatch/client"
 require "peerwatch/registry_merge"

@@ -31,6 +31,16 @@ module Peerwatch
     attr_accessor :retention_days
     # Plain http peer URLs are refused unless this is true.
     attr_accessor :allow_http
+    # Peerwatch refuses to connect to loopback, private, link-local and other
+    # non-public addresses, and refuses peer rows that name one, unless this
+    # is true (local testing only).
+    attr_accessor :allow_private_addresses
+    # nil means any. An Array of hostnames: a peer URL's host must be one of
+    # them (case-insensitive, exact match).
+    attr_accessor :allowed_peer_hosts
+    # nil means any. An Array of domains: every contact email must be at one
+    # of them (case-insensitive, exact match on the part after the @).
+    attr_accessor :allowed_contact_domains
 
     def initialize
       @admin_parent_controller = "ApplicationController"
@@ -46,6 +56,9 @@ module Peerwatch
       @fallback_after = 8 * 60
       @retention_days = 30
       @allow_http = false
+      @allow_private_addresses = false
+      @allowed_peer_hosts = nil
+      @allowed_contact_domains = nil
     end
 
     # Always a String (or nil): names are compared with registry rows and

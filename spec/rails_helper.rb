@@ -37,5 +37,8 @@ RSpec.configure do |config|
     end
     Rails.cache.clear
     ActionMailer::Base.deliveries.clear
+    # No spec touches a real resolver: every name resolves to one public
+    # documentation address unless the spec says otherwise (resolve_to).
+    allow(Peerwatch::Address).to receive(:resolve).and_return([ PeerwatchHelpers::DEFAULT_ADDRESS ])
   end
 end

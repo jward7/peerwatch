@@ -38,6 +38,12 @@
           <tr data-peer="<%= peer.name %>">
             <th scope="row">
               <%= peer.name %>
+              <% unless peer.permitted? %>
+                <div class="peerwatch-blocked">
+                  <span class="badge text-bg-warning">blocked by this app's rules</span>
+                  <div class="small text-body-secondary">Not probed, synced with or emailed: <%= peer.blocked_reasons.to_sentence %></div>
+                </div>
+              <% end %>
               <% if peer.in_maintenance? %>
                 <div class="small text-info-emphasis">
                   maintenance until <%= peerwatch_time(peer.maintenance_until) %><%= ": #{peer.maintenance_note}" if peer.maintenance_note.present? %>

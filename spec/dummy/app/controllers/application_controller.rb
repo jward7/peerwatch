@@ -7,5 +7,6 @@ class ApplicationController < ActionController::Base
 
   def bounce_locked_requests
     redirect_to host_home_path if params[:locked]
+    redirect_to dashboard_path if params[:refused]
   end
 end

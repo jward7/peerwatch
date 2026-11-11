@@ -40,7 +40,14 @@ module Peerwatch
       peer.assign_attributes(row.except("name"))
       peer.revision_at = incoming_at
       peer.syncing = true
-      peer.save
+      return true if peer.save
+
+      # Names the row and the rule, never the token. Messages name the
+      # field and the rule broken, not the offending value.
+      Peerwatch.logger&.warn(
+        "[Peerwatch] registry merge: ignored #{peer.name.inspect}: #{peer.errors.full_messages.to_sentence}"
+      )
+      false
     end
   end
 end
