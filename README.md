@@ -347,7 +347,7 @@ This is because there is still **one shared secret for the whole mesh**: any app
 token is every app's token, and the apps cannot tell an edit made by one app's admin
 from an edit made by someone who copied the token. Per-app credentials, or registry
 edits signed by the app that made them, would be the stronger design. Neither is
-implemented. Treat the token like a credential to every app's admin, and keep it in your
+implemented yet; see [docs/TODO_FUTURE_FEATURES.md](docs/TODO_FUTURE_FEATURES.md). Treat the token like a credential to every app's admin, and keep it in your
 credentials store, never in source.
 
 **Other properties:**

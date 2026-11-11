@@ -24,7 +24,10 @@ version may change the API or configuration.
   any address.
   - Peerwatch no longer connects to loopback, private (RFC 1918 and IPv6 unique-local),
     link-local, unspecified, multicast or other non-public addresses, including
-    IPv4-mapped IPv6 forms. The peers page and registry sync refuse a row whose URL is
+    IPv4-mapped and NAT64 IPv6 forms, IETF-assigned (192.0.0.0/24), benchmarking
+    (198.18.0.0/15) and discard (100::/64) ranges, and the Teredo, 6to4 and local-use
+    NAT64 tunnel forms. An address carrying a zone id (`%eth0`) is refused, and the
+    address dialled is the canonical form of the one checked. The peers page and registry sync refuse a row whose URL is
     such an IP address or `localhost` (or `*.localhost`), or whose stored IP address is
     not a public one. Every request resolves the name first, refuses it if any resolved
     address is not public, and connects to the address it checked, so the name cannot

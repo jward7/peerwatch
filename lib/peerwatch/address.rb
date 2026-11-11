@@ -17,10 +17,17 @@ module Peerwatch
     # ranges that are never a peer's public address. The documentation ranges
     # (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24, 2001:db8::/32) are
     # deliberately absent: they are public as far as this check goes.
+    #
+    # Also refused outright: IETF protocol assignments (192.0.0.0/24),
+    # benchmarking (198.18.0.0/15), discard-only (100::/64), and the IPv6
+    # transition forms that can tunnel to an IPv4 address without it sitting
+    # in the last 32 bits: Teredo (2001::/32), 6to4 (2002::/16) and local-use
+    # NAT64 (64:ff9b:1::/48). No real peer is reached through those.
     REFUSED_RANGES = %w[
       0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12
-      192.168.0.0/16 224.0.0.0/4 240.0.0.0/4
-      ::/96 fc00::/7 fe80::/10 fec0::/10 ff00::/8
+      192.0.0.0/24 192.168.0.0/16 198.18.0.0/15 224.0.0.0/4 240.0.0.0/4
+      ::/96 64:ff9b:1::/48 100::/64 2001::/32 2002::/16
+      fc00::/7 fe80::/10 fec0::/10 ff00::/8
     ].map { |range| IPAddr.new(range) }.freeze
 
     # IPv6 forms that carry an IPv4 address in their last 32 bits: IPv4-mapped
@@ -41,12 +48,14 @@ module Peerwatch
       REFUSED_RANGES.none? { |range| range.family == ip.family && range.include?(ip) }
     end
 
-    # An IPAddr, or nil when address is not an IP address. A zone id
-    # ("fe80::1%eth0") is dropped: it does not change which range it is in.
+    # An IPAddr, or nil when address is not an IP address. An address with a
+    # zone id ("fe80::1%eth0") is not one: zone ids only matter for
+    # link-local addresses, which are refused anyway, and stripping one would
+    # check a different string from the one dialled.
     def parse(address)
-      text = address.to_s.strip.delete_prefix("[").delete_suffix("]").sub(/%.*\z/, "")
+      text = address.to_s.strip.delete_prefix("[").delete_suffix("]")
       # A prefix ("192.0.2.0/24") is a range, not an address to dial.
-      text.empty? || text.include?("/") ? nil : IPAddr.new(text)
+      text.empty? || text.include?("/") || text.include?("%") ? nil : IPAddr.new(text)
     rescue IPAddr::Error
       nil
     end
@@ -82,8 +91,11 @@ module Peerwatch
       raise NotPublic, "#{host} resolves to a non-public address (#{refused.join(", ")})" if refused.any?
 
       # One address has to be chosen. IPv4 first: a host without working
-      # IPv6 would otherwise fail every check of a dual-stack peer.
-      addresses.find { |address| parse(address).ipv4? } || addresses.first
+      # IPv6 would otherwise fail every check of a dual-stack peer. The
+      # canonical form of the parsed address is returned, so what is dialled
+      # is exactly what was checked.
+      checked = addresses.map { |address| parse(address) }
+      (checked.find(&:ipv4?) || checked.first).to_s
     end
 
     def addresses_for(host, config)

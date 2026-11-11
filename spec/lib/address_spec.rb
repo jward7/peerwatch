@@ -21,6 +21,13 @@ RSpec.describe Peerwatch::Address do
       "::ffff:169.254.169.254" => false, # IPv4-mapped link-local
       "::ffff:10.0.0.1" => false,      # IPv4-mapped private
       "64:ff9b::a9fe:a9fe" => false,   # NAT64 form of 169.254.169.254
+      "64:ff9b:1::a9fe:a9fe" => false, # local-use NAT64
+      "2001:0:4136:e378::1" => false,  # Teredo
+      "2002:a9fe:a9fe::1" => false,    # 6to4 wrapping 169.254.169.254
+      "100::1" => false,               # discard-only
+      "192.0.0.170" => false,          # IETF protocol assignments
+      "198.18.0.1" => false,           # benchmarking
+      "203.0.113.10%eth0" => false,    # a zone id on anything is refused
       "203.0.113.10" => true,          # documentation range: public for this check
       "192.0.2.1" => true,             # documentation range: public for this check
       "198.51.100.7" => true,          # documentation range: public for this check
@@ -73,6 +80,10 @@ RSpec.describe Peerwatch::Address do
       resolve_to("bravo.example")
 
       expect { described_class.dial_address("bravo.example", config: config) }.to raise_error(described_class::NotPublic)
+    end
+
+    it "returns the canonical form of the address it checked" do
+      expect(described_class.dial_address("bravo.example", ip: " [2001:DB8:0::1] ", config: config)).to eq("2001:db8::1")
     end
 
     it "checks a given ip instead of resolving" do
