@@ -151,6 +151,91 @@ RSpec.describe Peerwatch::Evaluator do
     end
   end
 
+  # Every app probes on the same tick, so the report fetched in the cycle the
+  # elected sender alerts usually predates the alert. If the outage then ends
+  # within a cycle, handle_down never sees the alert.
+  describe "recording another observer's alert after a short outage" do
+    let(:alerted_at) { now + 2.minutes }
+
+    before do
+      Peerwatch.config.self_name = "charlie"
+      down_checks("bravo", 2)
+      evaluate(agreeing("alpha"))                               # quorum; alpha is elected
+      add_check("bravo", "down", at: now + 2.minutes)
+      evaluate(agreeing("alpha"), at: now + 2.minutes)          # alpha's report: fetched before it alerted
+      add_check("bravo", "up", at: now + 4.minutes)
+      add_check("bravo", "up", at: now + 6.minutes)
+    end
+
+    def alpha_row(resolved: false)
+      row = { "peer" => "bravo", "started_at" => (now - 2.minutes).iso8601, "planned" => false,
+              "alerted_at" => alerted_at.iso8601, "alerted_by" => "alpha" }
+      resolved ? row.merge("resolved_at" => (now + 6.minutes).iso8601) : row
+    end
+
+    def alpha_report(incidents: [], recent: [])
+      report("alpha", observations: { "bravo" => false }, incidents: incidents).merge("recent_incidents" => recent)
+    end
+
+    it "records it in the cycle this app resolves, from the sender's open incident" do
+      evaluate({ "alpha" => alpha_report(incidents: [ alpha_row ]) }, at: now + 6.minutes)
+
+      expect(incident).to have_attributes(resolved_at: now + 6.minutes, alerted_at: alerted_at, alerted_by: "alpha",
+                                          recovery_alerted_at: nil)
+    end
+
+    it "records it later, from the sender's recently resolved incidents" do
+      evaluate({ "alpha" => alpha_report }, at: now + 6.minutes)
+      expect(incident).to have_attributes(resolved_at: now + 6.minutes, alerted_by: nil)
+
+      evaluate({ "alpha" => alpha_report(recent: [ alpha_row(resolved: true) ]) }, at: now + 8.minutes)
+
+      expect(incident).to have_attributes(alerted_at: alerted_at, alerted_by: "alpha")
+    end
+
+    it "sends and notifies nothing more" do
+      sent = mails.size
+      before_events = events.dup
+
+      evaluate({ "alpha" => alpha_report(incidents: [ alpha_row ]) }, at: now + 6.minutes)
+
+      expect(mails.size).to eq(sent)
+      expect(events.map { |e| e[:event] }).to eq(before_events.map { |e| e[:event] } + [ :recovered ])
+    end
+
+    it "ignores an alert from a different outage of the same peer" do
+      old = alpha_row(resolved: true).merge("alerted_at" => (now - 3.hours).iso8601)
+
+      evaluate({ "alpha" => alpha_report(recent: [ old ]) }, at: now + 6.minutes)
+
+      expect(incident.alerted_by).to be_nil
+    end
+
+    it "ignores a report that claims this app alerted" do
+      evaluate({ "alpha" => alpha_report(incidents: [ alpha_row.merge("alerted_by" => "charlie") ]) },
+               at: now + 6.minutes)
+
+      expect(incident.alerted_by).to be_nil
+    end
+
+    it "gives up once the incident is older than the reports keep it" do
+      evaluate({ "alpha" => alpha_report }, at: now + 6.minutes)
+
+      evaluate({ "alpha" => alpha_report(recent: [ alpha_row(resolved: true) ]) }, at: now + 1.hour)
+
+      expect(incident.alerted_by).to be_nil
+    end
+
+    it "leaves an open incident to the normal alerting path" do
+      Peerwatch::Check.where(state: "up").delete_all
+      add_check("bravo", "down", at: now + 4.minutes)
+
+      evaluate({ "alpha" => alpha_report(incidents: [ alpha_row ]) }, at: now + 4.minutes) # alpha now says up
+
+      expect(incident).to have_attributes(resolved_at: nil, alerted_by: nil)
+    end
+  end
+
   it "never mails when this app cannot email, but still notifies" do
     Peerwatch.config.can_email = false
     down_checks("bravo", 2)

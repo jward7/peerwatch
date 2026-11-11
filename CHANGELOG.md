@@ -5,6 +5,26 @@ All notable changes to this project are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0, a minor
 version may change the API or configuration.
 
+## 0.2.1 — 2026-11-11
+
+### Fixed
+
+- An outage that ended within one probe cycle of the alert left "Alerted by" blank, and
+  `alerted_at` unset, on every app except the one that sent the email. Every app probes
+  on the same tick, so the report fetched in the cycle the sender alerted predated the
+  alert, and an app only copied another's alert while it still saw the peer down. Now
+  each status report also lists recently resolved, alerted incidents
+  (`recent_incidents`, the last 15 minutes), and each app records the sender on its own
+  resolved incident from them. Display and records only: who is emailed is unchanged.
+
+### Changed
+
+- The status report has a new `recent_incidents` list. Older versions ignore it, so
+  apps can be upgraded one at a time; an app records the sender only from apps on 0.2.1
+  or later.
+- Docs: "Alerting rules" in the README now says reports are a cycle behind, and why
+  that does not cause duplicate emails.
+
 ## 0.2.0 — 2026-11-11
 
 The admin pages are now a blank canvas that takes on the host's look and navigation.

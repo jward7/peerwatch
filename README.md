@@ -150,7 +150,7 @@ In **each** app:
 
 ```ruby
 # Gemfile (from git until the gem is released to RubyGems)
-gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.2.0"
+gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.2.1"
 ```
 
 ```sh
@@ -298,6 +298,14 @@ starts from the end of the window. Uptime figures leave planned downtime out.
   incident as alerted, nobody else sends. If the elected app has not sent within
   `fallback_after`, any other agreeing app that can email sends instead. This can
   occasionally produce two emails, which we prefer to none.
+- **Reports are a cycle behind.** Every app probes on the same two-minute tick, so the
+  report one app fetches from another usually predates whatever that app did in the
+  same cycle. An app therefore learns that another has already alerted up to two minutes
+  late. `fallback_after` (8 minutes by default) leaves several cycles of margin, so this
+  does not cause duplicate emails; keep it well above two cycles if you change it.
+- **Who alerted.** Every app records which app sent the down email, shown as "Alerted by"
+  on its dashboard. Reports also list recently resolved, alerted incidents, so an app
+  still records the sender when the outage ended within a cycle of the alert.
 - **Recipients.** The email goes to the contact addresses on the down app's row. A row
   with no contacts gets no email, but the incident is still marked as alerted, so no
   other app sends one either.

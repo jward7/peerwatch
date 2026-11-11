@@ -48,7 +48,7 @@ Until the gem is published to RubyGems, install it from a git tag:
 
 ```ruby
 # Gemfile
-gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.2.0"
+gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.2.1"
 ```
 
 Use the newest tag on the repository's releases page. A git-sourced gem needs `git`
@@ -553,7 +553,7 @@ attached, to any address your servers can reach.
 Read the [CHANGELOG](../CHANGELOG.md) entries between your version and the new one
 first; each lists upgrade notes where a change needs action. Then, in each app:
 
-1. **Bump the tag** in the `Gemfile`, for example `tag: "v0.2.0"`.
+1. **Bump the tag** in the `Gemfile`, for example `tag: "v0.2.1"`.
 2. **Update only Peerwatch:**
 
    ```sh

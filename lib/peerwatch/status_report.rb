@@ -1,8 +1,13 @@
 module Peerwatch
   # What this app tells the others: its own view of every peer, its open
-  # incidents, and whether it can send mail.
+  # incidents, recently resolved incidents that were alerted, and whether it
+  # can send mail.
   module StatusReport
     LOOKBACK = 20
+    # How long a resolved, alerted incident stays in recent_incidents, so the
+    # other apps can record who alerted even when the outage ended within a
+    # cycle of the alert. Several probe cycles.
+    RECENT_WINDOW = 15.minutes
 
     module_function
 
@@ -14,15 +19,28 @@ module Peerwatch
         "generated_at" => Time.current.utc.iso8601,
         "can_email" => config.can_email ? true : false,
         "observations" => observations(config),
-        "incidents" => Incident.open.order(:started_at).map do |incident|
-          {
-            "peer" => incident.peer_name,
-            "started_at" => incident.started_at.utc.iso8601,
-            "planned" => incident.planned,
-            "alerted_at" => incident.alerted_at&.utc&.iso8601,
-            "alerted_by" => incident.alerted_by
-          }
+        # Open incidents only: observers read an alerted entry here as "this
+        # outage is already being handled", so a resolved one must never be
+        # listed here.
+        "incidents" => Incident.open.order(:started_at).map { |incident| incident_row(incident) },
+        # Kept apart from "incidents" for that reason; older versions ignore it.
+        "recent_incidents" => recent_incidents.map do |incident|
+          incident_row(incident).merge("resolved_at" => incident.resolved_at.utc.iso8601)
         end
+      }
+    end
+
+    def recent_incidents(now = Time.current)
+      Incident.where.not(alerted_at: nil).where(resolved_at: (now - RECENT_WINDOW)..).order(:resolved_at)
+    end
+
+    def incident_row(incident)
+      {
+        "peer" => incident.peer_name,
+        "started_at" => incident.started_at.utc.iso8601,
+        "planned" => incident.planned,
+        "alerted_at" => incident.alerted_at&.utc&.iso8601,
+        "alerted_by" => incident.alerted_by
       }
     end
 
