@@ -237,6 +237,17 @@ With another backend, use its own recurring-job feature to enqueue
 The job does nothing until `self_name` is set, and it never raises. Problems are logged
 as lines starting with `[Peerwatch]`.
 
+Two things in a host app can trip over the jobs:
+
+- **A deploy guard that waits for imminent recurring jobs.** If your deploy script refuses
+  to proceed while a recurring job is due soon, exempt `Peerwatch::ProbeJob` and
+  `Peerwatch::PushJob`. A job that runs every two minutes is always due soon, so
+  otherwise every deploy is blocked. Skipping one probe cycle during a deploy is harmless.
+- **Specs that expect every job to inherit `ApplicationJob`.** Both Peerwatch jobs inherit
+  `ActiveJob::Base`, because an engine cannot depend on the host's `ApplicationJob`. A
+  spec asserting that every class in `config/recurring.yml` is `< ApplicationJob` needs
+  to allow classes in the `Peerwatch::` namespace, or check `< ActiveJob::Base` instead.
+
 ### 2.7 Add a nav link
 
 In your admin layout or menu:
