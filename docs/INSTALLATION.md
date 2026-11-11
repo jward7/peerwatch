@@ -47,7 +47,7 @@ Until the gem is published to RubyGems, install it from a git tag:
 
 ```ruby
 # Gemfile
-gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.1.2"
+gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.2.0"
 ```
 
 Use the newest tag on the repository's releases page. A git-sourced gem needs `git`
@@ -175,7 +175,8 @@ Your controller's route helpers (`root_path` above, a sign-in redirect, the link
 layout) keep working inside Peerwatch's pages. `config.layout` replaces the parent
 controller's layout, so set it to your admin layout. The views use Bootstrap 5 classes
 and bring no CSS of their own. They don't render flash messages, so your layout should;
-most layouts already do.
+most layouts already do. To fit the pages into your breadcrumbs and nav, or to restyle
+them, see [Making it look native](#making-it-look-native).
 
 **`mailer_parent`.** Name your own mailer, usually `"ApplicationMailer"`, so its
 `default from:` and any interceptors apply to alert mail. Both this and
@@ -266,13 +267,104 @@ Two things in a host app can trip over the jobs:
   spec asserting that every class in `config/recurring.yml` is `< ApplicationJob` needs
   to allow classes in the `Peerwatch::` namespace, or check `< ActiveJob::Base` instead.
 
-### 2.7 Add a nav link
+### 2.7 Add a nav link and make it look native
 
 In your admin layout or menu:
 
 ```erb
 <%= link_to "Peerwatch", peerwatch.dashboard_path %>
 ```
+
+#### Making it look native
+
+Peerwatch's pages are meant to be a blank canvas inside your admin. Out of the box:
+
+- **They render in your layout** (`config.layout`), behind your admin controller
+  (`admin_parent_controller`), so your navbar, sidebar, sign-in and flash messages are
+  all yours.
+- **Your links work.** Your app's route helpers, including ones that share a name with
+  a Peerwatch route such as `dashboard_path`, resolve to your routes inside Peerwatch's
+  pages. Reach Peerwatch's own routes through `peerwatch.`, as in
+  `peerwatch.dashboard_path` and `peerwatch.mesh_peers_path`.
+- **They leave layout and spacing to you.** Each page is a single
+  `<div class="peerwatch peerwatch-...">` with no container or padding of its own, so it
+  sits in your content area like any other admin page. The two classes are there for
+  scoping your own CSS.
+- **They set the page title.** Each page sets `content_for(:title)` (for example
+  `Peerwatch · Peers`) unless something already set it, so a layout that reads
+  `content_for(:title)` shows the right title.
+- **They use plain Bootstrap 5 classes** and ship no CSS or JavaScript.
+
+**Breadcrumbs and the active nav item.** Every page renders the partial
+`peerwatch/_page_chrome`, which renders nothing until you override it. Copy it into your
+app:
+
+```sh
+bin/rails g peerwatch:views -v chrome
+```
+
+It receives three locals:
+
+| Local | Example |
+|---|---|
+| `section` | `:dashboard` or `:peers` |
+| `title` | `"Peerwatch · Peers · Add a peer"` |
+| `crumbs` | `[["Peerwatch", "/peerwatch/"], ["Peers", "/peerwatch/peers"], ["Add a peer", nil]]` (the last one has no link) |
+
+For a layout that shows `content_for(:breadcrumbs)` in a Bootstrap breadcrumb bar:
+
+```erb
+<%# app/views/peerwatch/_page_chrome.html.erb %>
+<% content_for :breadcrumbs do %>
+  <% crumbs.each do |label, path| %>
+    <li class="breadcrumb-item"><%= path ? link_to(label, path) : label %></li>
+  <% end %>
+<% end %>
+```
+
+The same partial in Slim, with your own admin home as the first crumb:
+
+```slim
+/ app/views/peerwatch/_page_chrome.html.slim
+- content_for :breadcrumbs do
+  li.breadcrumb-item = link_to "Admin", main_app.admin_root_path
+  - crumbs.each do |label, path|
+    li.breadcrumb-item = path ? link_to(label, path) : label
+```
+
+The partial can set anything else your layout reads, such as a `content_for` that
+collapses a sidebar. Keep it free of output that should appear in the page body: it is
+rendered at the top of the page.
+
+To mark your Peerwatch nav item active, check the controller path in your layout or
+menu. It is `peerwatch/dashboard` or `peerwatch/peers` on Peerwatch's pages:
+
+```erb
+<%= link_to "Peerwatch", peerwatch.dashboard_path,
+      class: ["nav-link", ("active" if controller_path.start_with?("peerwatch/"))] %>
+```
+
+Don't test `controller_name == "dashboard"`: Peerwatch's dashboard controller has that
+name too, so your own Dashboard item would light up on Peerwatch's page.
+
+**Changing the pages themselves.** Copy the views into your app, as with
+`devise:views`:
+
+```sh
+bin/rails g peerwatch:views                  # everything
+bin/rails g peerwatch:views -v dashboard     # one or more groups
+```
+
+The groups are `chrome`, `dashboard`, `peers` and `mailer`. Your copies in
+`app/views/peerwatch/` take precedence over the gem's, so you can restyle them, swap
+Bootstrap classes for your own, or convert them to Slim or Haml (delete the `.erb` copy
+when you do). The pages are split into small partials, such as
+`dashboard/_matrix`, `dashboard/_state_badge`, `peers/_table` and `peers/_form`, so you
+can usually copy one partial rather than a whole page.
+
+Delete every copied file you don't change. A copy no longer follows the gem, so after
+upgrading Peerwatch, compare your copies with the new ones (rerun the generator into a
+scratch branch and diff) and read the CHANGELOG for view changes.
 
 ### 2.8 Create the peer rows
 
@@ -308,7 +400,7 @@ add a peer with the same name.
 
 For `bravo`, and each app after it:
 
-1. Follow sections [2.1](#21-add-the-gem) to [2.7](#27-add-a-nav-link) with the same token.
+1. Follow sections [2.1](#21-add-the-gem) to [2.7](#27-add-a-nav-link-and-make-it-look-native) with the same token.
 2. Set `self_name` to the name the first app gave this app's row (`"bravo"`).
 3. Set `seed_url` to any app already in the mesh:
 

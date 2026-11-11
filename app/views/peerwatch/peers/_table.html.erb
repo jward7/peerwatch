@@ -1,0 +1,39 @@
+<div class="table-responsive mb-4">
+  <table class="table table-sm align-middle">
+    <thead>
+      <tr>
+        <th scope="col">Name</th>
+        <th scope="col">Health URL</th>
+        <th scope="col">Environment</th>
+        <th scope="col">Contacts</th>
+        <th scope="col">Maintenance</th>
+        <th scope="col"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if @peers.empty? %>
+        <tr><td colspan="6" class="text-body-secondary">No peers yet. Start with this app's own row.</td></tr>
+      <% end %>
+      <% @peers.each do |peer| %>
+        <tr>
+          <td><%= peer.name %><%= " (this app)" if peer.self? %></td>
+          <td><code><%= peer.health_url %></code></td>
+          <td><%= peer.environment.presence || "—" %></td>
+          <td><%= peer.contact_emails.any? ? peer.contact_emails.join(", ") : "—" %></td>
+          <td>
+            <% if peer.in_maintenance? %>
+              until <%= peerwatch_time(peer.maintenance_until) %>
+            <% else %>
+              —
+            <% end %>
+          </td>
+          <td class="text-end text-nowrap">
+            <%= link_to "Edit", peerwatch.edit_mesh_peer_path(peer), class: "btn btn-outline-secondary btn-sm" %>
+            <%= button_to "Remove", peerwatch.mesh_peer_path(peer), method: :delete, form_class: "d-inline",
+                  class: "btn btn-outline-danger btn-sm" %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

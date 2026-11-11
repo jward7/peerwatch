@@ -33,6 +33,6 @@ module Peerwatch
     use_host_routes(self)
 
     layout -> { Peerwatch.config.layout }
-    helper Peerwatch::DashboardHelper
+    helper Peerwatch::DashboardHelper, Peerwatch::PageHelper
   end
 end

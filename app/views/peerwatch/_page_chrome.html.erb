@@ -1,0 +1,13 @@
+<%#
+  Renders nothing. Every Peerwatch page calls it, so a host can fit the pages
+  into its own navigation (breadcrumbs, active sidebar item) by overriding
+  this one file: bin/rails g peerwatch:views -v chrome
+
+  Locals:
+    section  :dashboard or :peers
+    title    such as "Peerwatch · Peers", already set as content_for(:title)
+    crumbs   [[label, path_or_nil], ...] from "Peerwatch" to this page; the
+             last one has no path
+
+  Examples: "Making it look native" in docs/INSTALLATION.md.
+%>

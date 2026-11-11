@@ -1,0 +1,3 @@
+<%# state: "up", "maintenance", "down" or "none". %>
+<% css, label = Peerwatch::DashboardHelper::STATE_BADGES.fetch(state, Peerwatch::DashboardHelper::STATE_BADGES["none"]) %>
+<span class="badge <%= css %>"><%= label %></span>

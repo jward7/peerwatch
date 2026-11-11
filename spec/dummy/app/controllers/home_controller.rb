@@ -1,5 +1,5 @@
 class HomeController < ApplicationController
   def show
-    render plain: "home"
+    render html: "home", layout: true
   end
 end

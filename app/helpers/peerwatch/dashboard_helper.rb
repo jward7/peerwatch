@@ -10,8 +10,7 @@ module Peerwatch
     def peerwatch_state_badge(state)
       return "—" if state == "self"
 
-      css, label = STATE_BADGES.fetch(state, STATE_BADGES["none"])
-      tag.span(label, class: "badge #{css}")
+      render "peerwatch/dashboard/state_badge", state: state
     end
 
     def peerwatch_uptime(value)

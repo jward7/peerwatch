@@ -38,6 +38,7 @@ configuration may change before 1.0.
 - [How it compares](#how-it-compares)
 - [Quick start](#quick-start)
 - [Configuration reference](#configuration-reference)
+- [Look and navigation](#look-and-navigation)
 - [Maintenance windows](#maintenance-windows)
 - [Alerting rules](#alerting-rules)
 - [Security and trust model](#security-and-trust-model)
@@ -149,7 +150,7 @@ In **each** app:
 
 ```ruby
 # Gemfile (from git until the gem is released to RubyGems)
-gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.1.2"
+gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.2.0"
 ```
 
 ```sh
@@ -194,7 +195,8 @@ it, and set `config.seed_url = "https://alpha.example"` (any app already in the 
 On its first probe cycle it pulls the whole registry from there.
 
 Within two cycles each app's dashboard at `/peerwatch` fills in. Then add a nav link to
-`peerwatch.dashboard_path` in your admin.
+`peerwatch.dashboard_path` in your admin, and see [Look and navigation](#look-and-navigation)
+to fit the pages into your breadcrumbs and styling.
 
 ## Configuration reference
 
@@ -229,6 +231,25 @@ automatic retry is turned off, so the two timeouts are the real limit on each re
 Redirects are never followed. Outbound requests ignore `http_proxy` and `https_proxy`
 in the environment, because a proxy would resolve peer names itself and defeat the
 address check described in [Security and trust model](#security-and-trust-model).
+
+## Look and navigation
+
+Peerwatch's admin pages are a blank canvas inside your app:
+
+- They render in your layout, behind your admin controller, so your navbar, sidebar,
+  sign-in and flash messages carry through, and your own route helpers keep working.
+- Each page is one `<div class="peerwatch ...">` with no container or padding, sets
+  `content_for(:title)`, and uses plain Bootstrap 5 classes with no CSS or JavaScript of
+  its own.
+- Every page renders an empty partial, `peerwatch/_page_chrome`, with the page's title,
+  breadcrumbs and section. Override it to fill your layout's breadcrumb bar or set
+  anything else your layout reads.
+- `bin/rails g peerwatch:views` copies the views into your app, as `devise:views` does,
+  so you can restyle them or convert them to Slim or Haml. `-v chrome`, `-v dashboard`,
+  `-v peers` or `-v mailer` copies only those.
+
+Examples, including marking your nav item active, are in
+[Making it look native](docs/INSTALLATION.md#making-it-look-native).
 
 ## Maintenance windows
 
@@ -401,8 +422,10 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
   take several times `open_timeout + read_timeout`. With many such peers, a cycle can
   outlast the two-minute schedule.
 - **Alert channels are email plus one callback.** There is no SMS, phone or escalation.
-- **The admin views assume Bootstrap 5 classes and a host layout.** They bring no CSS of
-  their own, and they don't render flash messages; your layout is expected to.
+- **The admin views use Bootstrap 5 classes and expect a host layout.** They bring no CSS
+  of their own, and they don't render flash messages; your layout is expected to. For
+  another CSS framework, copy the views with `bin/rails g peerwatch:views` and restyle
+  them.
 - **History is kept by name.** Checks and incidents belong to a peer's name, so a removed
   peer that is restored, or a new app given a removed app's name, inherits that history.
 - **The dashboard needs a shared cache.** The other observers' columns on the dashboard,

@@ -1,4 +1,5 @@
-<div class="container py-3">
+<%= peerwatch_page :peers, "Add a peer" %>
+<div class="peerwatch peerwatch-peer-form">
   <h1 class="h3 mb-3">Add a peer</h1>
   <%= render "form", peer: @peer, url: peerwatch.mesh_peers_path, method: :post %>
 </div>

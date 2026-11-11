@@ -35,6 +35,10 @@ module Peerwatch
              and admin_parent_controller (an admin-only controller), then add this
              app's own row on /peerwatch/peers.
 
+          5. Optional: fit the admin pages into your breadcrumbs and nav, or
+             restyle them:
+               bin/rails g peerwatch:views -v chrome   # or all views, without -v
+
           Full guide: https://github.com/jward7/peerwatch/blob/main/docs/INSTALLATION.md
         STEPS
       end

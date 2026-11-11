@@ -1,0 +1,6 @@
+<%# The host's override, as docs/INSTALLATION.md shows it. %>
+<% content_for :breadcrumbs do %>
+  <% crumbs.each do |label, path| %>
+    <li class="breadcrumb-item" data-section="<%= section %>"><%= path ? link_to(label, path) : label %></li>
+  <% end %>
+<% end %>

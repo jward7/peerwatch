@@ -5,6 +5,32 @@ All notable changes to this project are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0, a minor
 version may change the API or configuration.
 
+## 0.2.0 — 2026-11-11
+
+The admin pages are now a blank canvas that takes on the host's look and navigation.
+
+### Added
+
+- `bin/rails g peerwatch:views` copies the engine's views into the host, as
+  `devise:views` does. `-v chrome`, `-v dashboard`, `-v peers` and `-v mailer` copy only
+  those groups. The host's copies take precedence over the gem's.
+- Every admin page renders `peerwatch/_page_chrome` with `section`, `title` and
+  `crumbs` locals. It renders nothing by default; a host overrides it to fill its own
+  breadcrumb bar or anything else its layout reads.
+- Every admin page sets `content_for(:title)` ("Peerwatch · Peers" and so on) unless it
+  is already set.
+- Docs: "Making it look native" in `docs/INSTALLATION.md`, and "Look and navigation" in
+  the README, including how to mark a host nav item active.
+
+### Changed
+
+- The pages no longer wrap themselves in a Bootstrap `container` with padding; each is a
+  single `<div class="peerwatch peerwatch-...">` and the host's layout controls spacing.
+  A layout that relied on Peerwatch's own padding will look tighter.
+- The views are split into smaller partials (`dashboard/_matrix`,
+  `dashboard/_state_badge`, `peers/_table`, `peers/_removed`), so a host can override one
+  piece. The status badge is now a partial rather than markup built in a helper.
+
 ## 0.1.2 — 2026-11-11
 
 ### Fixed

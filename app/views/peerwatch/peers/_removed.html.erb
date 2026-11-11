@@ -1,0 +1,9 @@
+<details>
+  <summary class="text-body-secondary">Removed peers (<%= @removed_peers.size %>)</summary>
+  <p class="small text-body-secondary mt-2 mb-1">Add a peer with the same name to restore one.</p>
+  <ul class="list-unstyled small">
+    <% @removed_peers.each do |peer| %>
+      <li><%= peer.name %>, removed <%= peerwatch_time(peer.removed_at) %></li>
+    <% end %>
+  </ul>
+</details>
