@@ -1,0 +1,67 @@
+<div class="container-fluid py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Peerwatch</h1>
+    <%= link_to "Manage peers", peerwatch.mesh_peers_path, class: "btn btn-outline-primary btn-sm" %>
+  </div>
+
+  <% if @self_name.blank? %>
+    <div class="alert alert-warning">This app has no <code>self_name</code> configured, so it probes nothing.</div>
+  <% end %>
+
+  <h2 class="h5">What each app sees</h2>
+  <p class="text-body-secondary small mb-2">
+    Rows are the apps being watched; columns are the observers. The first column is this app's own checks;
+    the others are the reports each observer last sent.
+  </p>
+  <div class="table-responsive mb-4">
+    <table class="table table-sm align-middle" id="peerwatch-matrix">
+      <thead>
+        <tr>
+          <th scope="col">App</th>
+          <% @observers.each do |observer| %>
+            <th scope="col" class="text-center"><%= observer %><%= " (this app)" if observer == @self_name %></th>
+          <% end %>
+          <th scope="col">Environment</th>
+          <th scope="col" class="text-end">24h</th>
+          <th scope="col" class="text-end">7d</th>
+          <th scope="col" class="text-end">30d</th>
+          <th scope="col">Last checked</th>
+          <th scope="col" class="text-end">Latency</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if @peers.empty? %>
+          <tr><td colspan="<%= @observers.size + 7 %>" class="text-body-secondary">No peers yet.</td></tr>
+        <% end %>
+        <% @peers.each do |peer| %>
+          <% latest = @latest_checks[peer.name] %>
+          <tr data-peer="<%= peer.name %>">
+            <th scope="row">
+              <%= peer.name %>
+              <% if peer.in_maintenance? %>
+                <div class="small text-info-emphasis">
+                  maintenance until <%= peerwatch_time(peer.maintenance_until) %><%= ": #{peer.maintenance_note}" if peer.maintenance_note.present? %>
+                </div>
+              <% end %>
+            </th>
+            <% @observers.each do |observer| %>
+              <td class="text-center"><%= peerwatch_state_badge(@matrix[[ peer.name, observer ]]) %></td>
+            <% end %>
+            <td><%= peer.environment.presence || "—" %></td>
+            <% %w[24h 7d 30d].each do |span| %>
+              <td class="text-end"><%= peerwatch_uptime(@uptime.dig(peer.name, span)) %></td>
+            <% end %>
+            <td><%= peerwatch_time(latest&.checked_at) %></td>
+            <td class="text-end"><%= latest&.latency_ms ? "#{latest.latency_ms} ms" : "—" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="h5">Open incidents</h2>
+  <%= render "incidents", incidents: @open_incidents, empty: "None." %>
+
+  <h2 class="h5">Recently resolved</h2>
+  <%= render "incidents", incidents: @resolved_incidents, empty: "None yet." %>
+</div>

@@ -1,0 +1,4 @@
+# Rails Omakase style. It keeps RuboCop's default excludes (vendor/**), and
+# nothing in this repository generates Ruby files, so there is nothing to add.
+inherit_gem:
+  rubocop-rails-omakase: rubocop.yml

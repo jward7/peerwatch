@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Runs the specs; arguments pass through to rspec (bin/test spec/models).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec bundle exec rspec "$@"

@@ -1,0 +1,52 @@
+<%# method is explicit: a removed peer being restored is a persisted row on the create form. %>
+<%= form_with model: peer, url: url, method: method, scope: :peer do |f| %>
+  <% if peer.errors.any? %>
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        <% peer.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :name, class: "form-label" %>
+    <%= f.text_field :name, class: "form-control", readonly: method == :patch, required: true %>
+    <div class="form-text">Lowercase letters, digits, - and _. Must match that app's <code>self_name</code>.</div>
+  </div>
+  <div class="mb-3">
+    <%= f.label :url, "Base URL", class: "form-label" %>
+    <%= f.url_field :url, class: "form-control", placeholder: "https://alpha.example", required: true %>
+  </div>
+  <div class="mb-3">
+    <%= f.label :health_path, class: "form-label" %>
+    <%= f.text_field :health_path, class: "form-control" %>
+  </div>
+  <div class="mb-3">
+    <%= f.label :ip, "IP address (optional)", class: "form-label" %>
+    <%= f.text_field :ip, class: "form-control" %>
+    <div class="form-text">When set, a failed check is retried against this address to tell a DNS failure from an app failure.</div>
+  </div>
+  <div class="mb-3">
+    <%= f.label :environment, class: "form-label" %>
+    <%= f.text_field :environment, class: "form-control", placeholder: "production" %>
+  </div>
+  <div class="mb-3">
+    <%= f.label :contact_emails_text, "Contact emails", class: "form-label" %>
+    <%= f.text_area :contact_emails_text, class: "form-control", rows: 3, placeholder: "ops@example.com" %>
+    <div class="form-text">One per line or comma-separated. They are emailed when this app is down.</div>
+  </div>
+  <div class="mb-3">
+    <%= f.label :maintenance_until, "Maintenance until (#{Time.zone.name})", class: "form-label" %>
+    <%= f.datetime_local_field :maintenance_until, class: "form-control" %>
+    <div class="form-text">While a window is open, failures are recorded but nobody is alerted. Clear it to end the window.</div>
+  </div>
+  <div class="mb-3">
+    <%= f.label :maintenance_note, class: "form-label" %>
+    <%= f.text_field :maintenance_note, class: "form-control" %>
+  </div>
+
+  <%= f.submit "Save", class: "btn btn-primary" %>
+  <%= link_to "Cancel", peerwatch.mesh_peers_path, class: "btn btn-link" %>
+<% end %>

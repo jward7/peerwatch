@@ -1,0 +1,10 @@
+# SQLite in memory by default. Set DATABASE_URL to run the suite against
+# another database, for example
+#   DATABASE_URL=postgres://localhost/peerwatch_test bundle exec rspec
+test:
+<% if ENV["DATABASE_URL"].to_s.empty? %>
+  adapter: sqlite3
+  database: ":memory:"
+<% else %>
+  url: <%= ENV["DATABASE_URL"] %>
+<% end %>

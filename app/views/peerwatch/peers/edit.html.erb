@@ -1,0 +1,4 @@
+<div class="container py-3">
+  <h1 class="h3 mb-3">Edit <%= @peer.name %></h1>
+  <%= render "form", peer: @peer, url: peerwatch.mesh_peer_path(@peer), method: :patch %>
+</div>

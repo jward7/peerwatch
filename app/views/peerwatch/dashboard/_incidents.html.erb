@@ -1,0 +1,28 @@
+<% if incidents.empty? %>
+  <p class="text-body-secondary"><%= empty %></p>
+<% else %>
+  <div class="table-responsive mb-4">
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <th scope="col">App</th>
+          <th scope="col">Started</th>
+          <th scope="col">Resolved</th>
+          <th scope="col">Planned</th>
+          <th scope="col">Alerted by</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% incidents.each do |incident| %>
+          <tr>
+            <td><%= incident.peer_name %></td>
+            <td><%= peerwatch_time(incident.started_at) %></td>
+            <td><%= peerwatch_time(incident.resolved_at) %></td>
+            <td><%= incident.planned ? "yes" : "no" %></td>
+            <td><%= incident.alerted_by.presence || "—" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

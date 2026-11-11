@@ -1,0 +1,17 @@
+/.bundle/
+/vendor/bundle/
+/pkg/
+/tmp/
+/log/
+/coverage/
+*.gem
+/spec/dummy/log/
+/spec/dummy/tmp/
+/spec/dummy/db/*.sqlite3*
+/spec/examples.txt
+.DS_Store
+# A gem's lockfile is not shipped; CI resolves fresh for each Rails version.
+Gemfile.lock
+
+# Local publishing checklist (temporary; never commit)
+/TODO-PUBLISH.md

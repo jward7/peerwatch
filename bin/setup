@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Installs the development dependencies. Add the PostgreSQL driver with
+#   bundle config set --local with postgres
+set -euo pipefail
+cd "$(dirname "$0")/.."
+bundle install
