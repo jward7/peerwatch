@@ -31,6 +31,22 @@ RSpec.describe Peerwatch::RegistryMerge do
     expect(Peerwatch::Peer.find_by!(name: "bravo").environment).to eq("production")
   end
 
+  it "rejects a row stamped too far in the future" do
+    described_class.call([ row("bravo", earlier, environment: "production") ])
+    far = Time.current + described_class::MAX_CLOCK_SKEW + 1.minute
+
+    expect(described_class.call([ row("bravo", far, environment: "fast-clock") ])).to eq(0)
+    expect(described_class.call([ row("charlie", far) ])).to eq(0)
+    expect(Peerwatch::Peer.find_by!(name: "bravo").environment).to eq("production")
+    expect(Peerwatch::Peer.exists?(name: "charlie")).to be(false)
+  end
+
+  it "accepts a row within the allowed clock skew" do
+    slightly_ahead = Time.current + 1.minute
+
+    expect(described_class.call([ row("bravo", slightly_ahead) ])).to eq(1)
+  end
+
   it "syncs a tombstone" do
     described_class.call([ row("bravo", earlier) ])
 

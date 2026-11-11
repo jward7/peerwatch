@@ -82,7 +82,9 @@ five steps.
    `/peerwatch/status`, which is that peer's own view of everyone. From each peer that
    sent a report, it then pulls the registry, the shared list of apps with their URLs, contacts and maintenance
    windows. An edit on any app's peers page is pushed to every other app at once and
-   repaired by these pulls. For each app in the list, the newest edit wins. A removed app
+   repaired by these pulls. For each app in the list, the newest edit wins; an edit
+   stamped more than five minutes in the future is ignored, so keep clocks in sync
+   (NTP). A removed app
    stays in the list as a tombstone, so the removal syncs too.
 3. **Agree.** After `failure_threshold` failed checks in a row (default 2), the job opens
    an incident for that peer. It alerts only when at least one other observer's latest

@@ -5,6 +5,14 @@ All notable changes to this project are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0, a minor
 version may change the API or configuration.
 
+## 0.1.1 — 2026-11-11
+
+### Fixed
+
+- Registry sync ignores a row whose `revision_at` is more than five minutes in the
+  future, and logs a warning. Before, one app with a fast clock could stamp a row that
+  no later edit in any app could replace until real time caught up.
+
 ## 0.1.0 — 2026-11-11
 
 First release.
