@@ -46,13 +46,17 @@ Until the gem is published to RubyGems, install it from a git tag:
 
 ```ruby
 # Gemfile
-gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.1.0"
+gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.1.1"
 ```
+
+Use the newest tag on the repository's releases page. A git-sourced gem needs `git`
+wherever `bundle install` runs, including the build stage of a Docker image (the
+Dockerfile Rails generates installs it there).
 
 Once it is released, use the RubyGems version instead:
 
 ```ruby
-gem "peerwatch", "~> 0.1.0"
+gem "peerwatch", "~> 0.1"
 ```
 
 Then:
@@ -329,7 +333,7 @@ Run through this list after each install. `alpha.example` is the app being check
    it with `MINUTES=0`.
 
 If something is missing, look in the logs of both apps for lines starting with
-`[Peerwatch]`, and in the access logs for requests with the User-Agent `peerwatch/0.1.0`.
+`[Peerwatch]`, and in the access logs for requests with the User-Agent `peerwatch/<version>`.
 
 ## 5. What commonly blocks the endpoints
 

@@ -28,7 +28,7 @@ Here alpha and bravo agree that charlie is down, so one of them emails charlie's
 Delta is in maintenance, so nobody is told about it. An app that is down or in maintenance
 cannot send its own report, which is why its column reads "no data".
 
-**Status:** version 0.1.0. It is new and has not yet run in production. The API and
+**Status:** version 0.1.x. It is new and has not yet run in production. The API and
 configuration may change before 1.0.
 
 ## Contents
@@ -149,7 +149,7 @@ In **each** app:
 
 ```ruby
 # Gemfile (from git until the gem is released to RubyGems)
-gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.1.0"
+gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.1.1"
 ```
 
 ```sh
