@@ -13,6 +13,7 @@ to follow it. The examples use the placeholder apps `alpha` (the first app) and 
 - [6. A staging app with a mail catcher](#6-a-staging-app-with-a-mail-catcher)
 - [7. Uninstalling](#7-uninstalling)
 - [8. Trying two apps on one machine](#8-trying-two-apps-on-one-machine)
+- [9. Upgrading](#9-upgrading)
 
 ## 1. Prerequisites
 
@@ -344,8 +345,10 @@ menu. It is `peerwatch/dashboard` or `peerwatch/peers` on Peerwatch's pages:
       class: ["nav-link", ("active" if controller_path.start_with?("peerwatch/"))] %>
 ```
 
-Don't test `controller_name == "dashboard"`: Peerwatch's dashboard controller has that
-name too, so your own Dashboard item would light up on Peerwatch's page.
+Checking the path works as well, as long as it matches where you mounted the engine:
+`request.path.start_with?("/peerwatch")`. Don't test `controller_name == "dashboard"`:
+Peerwatch's dashboard controller has that name too, so your own Dashboard item would
+light up on Peerwatch's page.
 
 **Changing the pages themselves.** Copy the views into your app, as with
 `devise:views`:
@@ -544,3 +547,33 @@ probe by hand with `bin/rails runner "Peerwatch::ProbeJob.perform_now"` in each 
 schedule it as in [2.6](#26-schedule-the-probe). Never set either option in production:
 together they let anyone with the token make your apps send requests, with the token
 attached, to any address your servers can reach.
+
+## 9. Upgrading
+
+Read the [CHANGELOG](../CHANGELOG.md) entries between your version and the new one
+first; each lists upgrade notes where a change needs action. Then, in each app:
+
+1. **Bump the tag** in the `Gemfile`, for example `tag: "v0.2.0"`.
+2. **Update only Peerwatch:**
+
+   ```sh
+   bundle update peerwatch --conservative
+   ```
+
+   Without `--conservative`, Bundler also updates every gem Peerwatch depends on, which
+   for Peerwatch means Rails and its dependencies. Check that the `Gemfile.lock` diff
+   touches only the `peerwatch` entry.
+3. **Copy any new migrations** and run them. Most releases have none, and the command
+   copies nothing when there is nothing new:
+
+   ```sh
+   bin/rails peerwatch:install:migrations
+   bin/rails db:migrate
+   ```
+
+4. **Compare any views you copied** with `peerwatch:views` against the new ones, if the
+   CHANGELOG mentions view changes (see [Making it look native](#making-it-look-native)).
+5. **Run your specs and deploy.**
+
+Apps in a mesh can run different Peerwatch versions while you roll an upgrade out, unless
+the CHANGELOG says otherwise, so there is no need to deploy them all at once.

@@ -196,7 +196,9 @@ On its first probe cycle it pulls the whole registry from there.
 
 Within two cycles each app's dashboard at `/peerwatch` fills in. Then add a nav link to
 `peerwatch.dashboard_path` in your admin, and see [Look and navigation](#look-and-navigation)
-to fit the pages into your breadcrumbs and styling.
+to fit the pages into your breadcrumbs and styling. To upgrade later, see
+[Upgrading](docs/INSTALLATION.md#9-upgrading): use `bundle update peerwatch --conservative`
+so Rails is not updated along with it.
 
 ## Configuration reference
 
