@@ -91,6 +91,86 @@ RSpec.describe Peerwatch::ProbeJob do
     expect(states).to eq([ %w[bravo up] ])
   end
 
+  context "when this app's rules block every peer" do
+    let(:notices) { [] }
+
+    before do
+      Peerwatch.config.notifier = ->(payload) { notices << payload }
+      Peerwatch::Peer.where.not(name: "alpha").update_all(contact_emails: [ "ops@elsewhere.example" ])
+      Peerwatch.config.allowed_contact_domains = %w[alpha.example]
+    end
+
+    it "probes nobody and tells the notifier once per peer" do
+      described_class.perform_now
+      described_class.perform_now
+
+      expect(Peerwatch::Check.count).to eq(0)
+      expect(notices.map { |n| [ n[:event], n[:peer] ] })
+        .to eq([ [ :blocked, "bravo" ], [ :blocked, "charlie" ], [ :blocked, "delta" ] ])
+      expect(notices.first[:subject]).to start_with("Peerwatch: bravo is blocked by alpha's rules (noticed ")
+      expect(notices.first[:body]).to include("allowed_contact_domains", "alpha is watching nobody")
+      expect(notices.first[:body]).not_to include("elsewhere.example")
+    end
+
+    it "tells the notifier again after a day" do
+      described_class.perform_now
+      travel_to(25.hours.from_now) { described_class.perform_now }
+
+      expect(notices.count { |n| n[:peer] == "bravo" }).to eq(2)
+      expect(notices.map { |n| n[:subject] }.uniq.size).to eq(6)
+    end
+
+    it "does not call a notifier it cannot remember having called" do
+      allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::NullStore.new)
+
+      described_class.perform_now
+
+      expect(notices).to be_empty
+    end
+
+    it "pulls the repaired rows from the seed and probes again in the same run" do
+      Peerwatch.config.seed_url = "https://bravo.example"
+      fixed = %w[bravo charlie delta].map do |name|
+        { "name" => name, "url" => "https://#{name}.example", "health_path" => "/up",
+          "contact_emails" => [ "ops@alpha.example" ], "revision_at" => 1.minute.from_now.iso8601(6) }
+      end
+      stub_request(:get, "https://bravo.example/peerwatch/registry")
+        .to_return(status: 200, body: { peers: fixed }.to_json)
+
+      described_class.perform_now
+
+      expect(states).to eq([ %w[bravo up], %w[charlie maintenance], %w[delta down] ])
+      expect(notices).to be_empty
+    end
+
+    it "asks nobody when there is no seed" do
+      described_class.perform_now
+
+      expect(a_request(:get, %r{/peerwatch/registry})).not_to have_been_made
+    end
+  end
+
+  it "reports one blocked peer among permitted ones, and again if it is blocked a second time" do
+    notices = []
+    Peerwatch.config.notifier = ->(payload) { notices << payload }
+    # bravo's registry adds echo on the first run, so later runs probe it.
+    stub_request(:get, "https://echo.example/up").to_return(status: 200)
+    stub_request(:get, "https://echo.example/peerwatch/status").to_return(status: 503)
+    delta = Peerwatch::Peer.find_by!(name: "delta")
+    delta.update_columns(ip: "10.0.0.1")
+
+    described_class.perform_now
+    expect(notices.map { |n| n[:peer] }).to eq([ "delta" ])
+    expect(notices.first[:body]).not_to include("watching nobody")
+
+    delta.update_columns(ip: nil)
+    described_class.perform_now
+    delta.update_columns(ip: "10.0.0.1")
+    described_class.perform_now
+
+    expect(notices.map { |n| n[:peer] }).to eq(%w[delta delta])
+  end
+
   it "does nothing without a self_name" do
     Peerwatch.config.self_name = nil
 

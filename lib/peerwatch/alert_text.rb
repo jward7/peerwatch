@@ -48,6 +48,26 @@ module Peerwatch
       ].join("\n")
     end
 
+    def blocked_subject(peer, noticed_at)
+      "Peerwatch: #{peer.name} is blocked by #{Peerwatch.config.self_name}'s rules (noticed #{stamp(noticed_at)})"
+    end
+
+    # watching: how many other peers this app still probes.
+    def blocked_body(peer, watching:)
+      lines = [
+        "Peer: #{peer.name}",
+        "URL: #{peer.health_url}",
+        "Why: #{peer.blocked_reasons.to_sentence}",
+        "#{Peerwatch.config.self_name} does not probe this peer, sync with it, count it as an " \
+          "observer or email its contacts until the row or the rules change. Fix one of them: " \
+          "the row on the peers page, or the rules in the Peerwatch initializer."
+      ]
+      if watching.zero?
+        lines << "Every peer is blocked: #{Peerwatch.config.self_name} is watching nobody."
+      end
+      lines.join("\n")
+    end
+
     def stamp(time)
       time.utc.strftime("%Y-%m-%d %H:%M UTC")
     end

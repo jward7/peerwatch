@@ -2,6 +2,10 @@ module Peerwatch
   # Every two minutes: probe each peer, collect their reports, merge their
   # registries, evaluate incidents and prune old checks. Never raises.
   class ProbeJob < ActiveJob::Base
+    # How long the notifier stays quiet about a peer it has already been told
+    # is blocked. A peer still blocked after this is reported again.
+    BLOCKED_REMINDER = 24.hours
+
     queue_as { Peerwatch.config.queue_name }
 
     def perform
@@ -14,11 +18,18 @@ module Peerwatch
       config = Peerwatch.config
       return if config.self_name.blank?
 
-      # Joining via the seed URL: nothing to probe until the registry arrives.
-      Sync.pull if others.none?
-
-      peers, blocked = others.order(:name).to_a.partition(&:permitted?)
+      peers, blocked = partitioned
+      # Nobody this app may ask: it has not joined yet, or its rules now block
+      # every row it holds. Peers are the usual source of registry rows, so
+      # without them the seed URL is the only way a row (or its repair) can
+      # still arrive.
+      if peers.empty?
+        Sync.pull
+        peers, blocked = partitioned
+      end
       log_blocked(blocked)
+      notify_blocked(blocked, watching: peers.size)
+      forget_blocked(peers)
       reports = {}
       kinds = {}
       peers.each do |peer|
@@ -67,6 +78,47 @@ module Peerwatch
 
     def others
       Peer.live.where.not(name: Peerwatch.config.self_name)
+    end
+
+    # [permitted, blocked] among the other live peers.
+    def partitioned
+      others.order(:name).to_a.partition(&:permitted?)
+    end
+
+    # A blocked peer is not probed, so no check fails and no incident opens:
+    # without this the host hears nothing, however long it lasts. One call
+    # per peer, then quiet for BLOCKED_REMINDER. The cache is the only memory
+    # of having told the host, so a cache that keeps nothing gets no call
+    # (the log line below still says so every run) rather than one a cycle.
+    def notify_blocked(blocked, watching:)
+      notifier = Peerwatch.config.notifier
+      return if notifier.nil?
+
+      blocked.each do |peer|
+        Peerwatch.quietly("blocked notice #{peer.name}") do
+          key = blocked_key(peer)
+          next if Rails.cache.read(key)
+
+          noticed_at = Time.current
+          Rails.cache.write(key, noticed_at.utc.iso8601, expires_in: BLOCKED_REMINDER)
+          next unless Rails.cache.read(key)
+
+          notifier.call({ event: :blocked, peer: peer.name,
+                          subject: AlertText.blocked_subject(peer, noticed_at),
+                          body: AlertText.blocked_body(peer, watching: watching) })
+        end
+      end
+    end
+
+    # A peer that is permitted again is reported afresh if it is blocked again.
+    def forget_blocked(peers)
+      Peerwatch.quietly("blocked notice reset") do
+        peers.each { |peer| Rails.cache.delete(blocked_key(peer)) }
+      end
+    end
+
+    def blocked_key(peer)
+      "peerwatch/blocked/#{peer.name}"
     end
 
     # One line per run, however many peers are blocked.

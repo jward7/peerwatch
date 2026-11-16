@@ -150,7 +150,7 @@ In **each** app:
 
 ```ruby
 # Gemfile (from git until the gem is released to RubyGems)
-gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.2.1"
+gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.3.0"
 ```
 
 ```sh
@@ -215,7 +215,7 @@ Peerwatch's controllers and mailer load, so set them in the initializer and nowh
 | `layout` | `"application"` | The layout the admin pages render in. |
 | `mailer_parent` | `"ActionMailer::Base"` | The class the alert mailer inherits, as a string, so your From address and interceptors apply. |
 | `can_email` | `true` | Set to `false` for an app whose mail reaches nobody (a staging mail catcher). It still observes and votes, but never sends alert mail. |
-| `notifier` | `nil` | A callable, given `{ event:, peer:, subject:, body: }` once per down and recovery event. See [Alerting rules](#alerting-rules). |
+| `notifier` | `nil` | A callable, given `{ event:, peer:, subject:, body: }` once per down and recovery event, and daily for a peer this app's rules block. See [Alerting rules](#alerting-rules). |
 | `queue_name` | `:default` | The queue for `ProbeJob` and `PushJob`. |
 | `open_timeout` | `5` | Seconds to wait to connect, for every outbound request. |
 | `read_timeout` | `5` | Seconds to wait for an answer, for every outbound request. |
@@ -312,17 +312,26 @@ starts from the end of the window. Uptime figures leave planned downtime out.
 - **Recovery.** After `recovery_threshold` good checks in a row (`maintenance` counts as
   good), the incident is resolved. The app that sent the down email sends the recovery
   email. If that app is itself unreachable at that moment, no recovery email is sent.
+- **Blocked peers.** A peer this app's own rules block (`allowed_peer_hosts`,
+  `allowed_contact_domains`, a non-public address) is not probed, so it can never be
+  "down" and none of the rules above applies to it. The app calls its `notifier` with
+  `event: :blocked` instead, once per blocked peer and again each day while it lasts;
+  the body gives the rule broken and says so when every peer is blocked and the app is
+  watching nobody. No email is sent. This relies on `Rails.cache` to remember that the
+  host was told; with a cache that keeps nothing (`:null_store`) the notifier is not
+  called and the only sign is the log line and the dashboard.
 - **Subjects** carry the peer name and the incident start, so a host that dedupes alerts
   on the exact subject still hears about every incident:
   - `Peerwatch: bravo is down (since 2026-01-05 03:12 UTC)`
   - `Peerwatch: bravo is still down after its maintenance window (since 2026-01-05 03:12 UTC)`
   - `Peerwatch: bravo recovered (down since 2026-01-05 03:12 UTC)`
+  - `Peerwatch: bravo is blocked by alpha's rules (noticed 2026-01-05 03:12 UTC)`
 
 The `notifier` is called from inside the probe job with one Hash:
 
 ```ruby
 {
-  event:   :down,           # or :recovered
+  event:   :down,           # or :recovered, or :blocked
   peer:    "bravo",         # the peer's name, a String
   subject: "Peerwatch: bravo is down (since 2026-01-05 03:12 UTC)",
   body:    "Peer: bravo\nURL: https://bravo.example/up\nDown since: ..."  # the email body text

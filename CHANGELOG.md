@@ -5,6 +5,33 @@ All notable changes to this project are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0, a minor
 version may change the API or configuration.
 
+## 0.3.0 — 2026-11-16
+
+### Fixed
+
+- An app whose rules blocked every peer it knew went silent and could not repair
+  itself. Tightening `allowed_contact_domains` (or `allowed_peer_hosts`) while the
+  stored rows still broke the new rule left the probe job running every cycle, probing
+  nobody, failing nothing and telling nobody; and because registry rows are pulled only
+  from permitted peers, the corrected rows could arrive only by another app's push. Now:
+  - The probe job pulls the registry from `seed_url` whenever it has no peer it may
+    ask, not only when it holds no peer rows at all.
+  - The host's `notifier` is called for each blocked peer (below).
+
+### Added
+
+- A third notifier event, `:blocked`: `{ event: :blocked, peer:, subject:, body: }`,
+  once for each peer this app's rules block and again every 24 hours while it stays
+  blocked. The body names the rule broken (never the offending value) and says when
+  every peer is blocked. No email is sent. It needs a `Rails.cache` that stores entries.
+
+### Upgrade notes
+
+- A `notifier` that branches on `event` should pass on events it does not know. One
+  that raises on `:blocked` is logged and ignored, so nothing breaks, but the notice is
+  lost.
+- Apps can be upgraded one at a time: nothing in the status report or registry changed.
+
 ## 0.2.1 — 2026-11-11
 
 ### Fixed

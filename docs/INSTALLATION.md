@@ -48,7 +48,7 @@ Until the gem is published to RubyGems, install it from a git tag:
 
 ```ruby
 # Gemfile
-gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.2.1"
+gem "peerwatch", git: "https://github.com/jward7/peerwatch", tag: "v0.3.0"
 ```
 
 Use the newest tag on the repository's releases page. A git-sourced gem needs `git`
@@ -185,9 +185,12 @@ them, see [Making it look native](#making-it-look-native).
 this initializer and nowhere else.
 
 **`notifier`.** An optional callable for your own alert channel, alongside email. It
-receives a Hash with `event` (`:down` or `:recovered`), `peer` (the peer's name),
-`subject` and `body` (the email's subject and body text). Every app that agrees a peer is
-down calls its own notifier once, and once more on recovery. It runs inside the probe
+receives a Hash with `event` (`:down`, `:recovered` or `:blocked`), `peer` (the peer's
+name), `subject` and `body` (the email's subject and body text). Every app that agrees a
+peer is down calls its own notifier once, and once more on recovery. It is also called
+with `:blocked`, once a day, for each peer this app's own rules stop it probing, which
+nothing else would report. Write it to pass on any event, not only the ones it knows. It
+runs inside the probe
 job, and anything it raises is logged and ignored. If it does slow work, such as calling
 another service, have it enqueue a job of your own, as in the example above
 (`OpsAlertJob` stands for a job in your app).
@@ -553,7 +556,7 @@ attached, to any address your servers can reach.
 Read the [CHANGELOG](../CHANGELOG.md) entries between your version and the new one
 first; each lists upgrade notes where a change needs action. Then, in each app:
 
-1. **Bump the tag** in the `Gemfile`, for example `tag: "v0.2.1"`.
+1. **Bump the tag** in the `Gemfile`, for example `tag: "v0.3.0"`.
 2. **Update only Peerwatch:**
 
    ```sh

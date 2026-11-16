@@ -18,8 +18,9 @@ module Peerwatch
     # False for an app whose mail does not reach real inboxes (a staging app
     # with a mail catcher). It still observes and votes; it never sends.
     attr_accessor :can_email
-    # Called once per incident event with a Hash: { event: :down | :recovered,
-    # peer:, subject:, body: }. Wire it to the host's own alert channel.
+    # Called with a Hash: { event: :down | :recovered | :blocked, peer:,
+    # subject:, body: }. Once per incident event, and once a day for a peer
+    # this app's rules block. Wire it to the host's own alert channel.
     attr_accessor :notifier
     attr_accessor :queue_name
     attr_accessor :open_timeout, :read_timeout
