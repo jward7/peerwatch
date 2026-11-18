@@ -87,21 +87,30 @@ For the maintainer.
 1. Update `Peerwatch::VERSION` in `lib/peerwatch/version.rb`.
 2. In `CHANGELOG.md`, replace "Unreleased" with the version and today's date. Update the
    example tag in `README.md` and `docs/INSTALLATION.md` to the new version.
-3. Run `bundle exec rake` and make sure CI is green on the main branch.
-4. Commit, then tag: `git tag -a vX.Y.Z -m "vX.Y.Z"` and `git push origin main vX.Y.Z`.
-5. Build the gem and check what goes into it:
+3. Run `bundle exec rake`, commit, push, and make sure CI is green on that commit.
+4. Tag it: `git tag -a vX.Y.Z -m "vX.Y.Z"` and `git push origin vX.Y.Z`. Apps that pin
+   Peerwatch by `tag:` and run Dependabot get a PR for the new tag.
+5. Create the GitHub release, with the CHANGELOG entry as its notes. Don't skip this:
+   it marks the release as "Latest" on GitHub, and Dependabot copies its notes into the
+   PRs it opens in each app.
+
+   ```sh
+   awk '/^## X.Y.Z/{f=1;next} /^## /{if(f)exit} f' CHANGELOG.md > /tmp/notes.md
+   gh release create vX.Y.Z --title "X.Y.Z" --verify-tag --notes-file /tmp/notes.md
+   ```
+
+To publish on RubyGems as well (not done yet; until then, apps install from the tag):
+
+6. Build the gem and check what goes into it:
 
    ```sh
    gem build peerwatch.gemspec
    tar -xOf peerwatch-X.Y.Z.gem data.tar.gz | tar -tz
    ```
 
-6. Push it. The gemspec sets `rubygems_mfa_required`, so RubyGems asks for your
-   one-time code:
+7. Push it, then delete the built `.gem` file. The gemspec sets
+   `rubygems_mfa_required`, so RubyGems asks for your one-time code:
 
    ```sh
    gem push peerwatch-X.Y.Z.gem
    ```
-
-7. Delete the built `.gem` file, and create a GitHub release for the tag with the
-   CHANGELOG entry as its notes.
